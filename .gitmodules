@@ -1,0 +1,3 @@
+[submodule "lib/sACN"]
+	path = lib/sACN
+	url = https://github.com/ETCLabs/sACN.git
