@@ -1,11 +1,7 @@
-﻿// sACNtoOpenDmx.h : Include file for standard system include files,
-// or project specific include files.
+﻿#pragma once
 
-#pragma once
+UINT const WMAPP_READY = WM_APP + 2;
 
-#include <iostream>
-#include "sacn/cpp/common.h"
-#include "sacn/cpp/receiver.h"
-
-
-// TODO: Reference additional headers your program requires here.
+DWORD WINAPI ThreadFun(LPVOID lpParam);
+void RunThread(HWND hwnd);
+void FinishThread();

@@ -1,14 +1,25 @@
-﻿// sACNtoOpenDmx.cpp : Defines the entry point for the application.
-//
-
+﻿#include <iostream>
+#include "sacn/cpp/common.h"
+#include "sacn/cpp/receiver.h"
+#include "resource.h"
+#include <Windows.h>
 #include "sACNtoOpenDmx.h"
+#include <mutex> 
+#include "lib/usb_pro/pro_driver.h"
+
 
 using namespace std;
 
-const int my_start_addr = 1;
-const int MY_DMX_FOOTPRINT = 1;
+unsigned char* myDmx = new unsigned char[530]();
+mutex mtx;
 
-uint8_t dmx_data;
+HANDLE hThread;
+bool keep_running = true;
+uint16_t ftdi_connected = false;
+
+typedef struct ThreadData {
+	HWND hwnd;
+} DATA, *PDATA;
 
 class MyNotifyHandler : public sacn::Receiver::NotifyHandler
 {
@@ -24,12 +35,11 @@ class MyNotifyHandler : public sacn::Receiver::NotifyHandler
 		else
 			std::cout << "\n";
 
-		// Example for an sACN-enabled fixture...
-		if (header.start_code == 0 && my_start_addr + MY_DMX_FOOTPRINT <= header.slot_count)
+		if (header.start_code == 0 && ftdi_connected)
 		{
-			memcpy(&dmx_data, &pdata[my_start_addr], MY_DMX_FOOTPRINT);
-			// Act on the data somehow
-			std::cout << static_cast<int>(dmx_data) << std::endl;
+			mtx.lock();
+			memcpy(&myDmx[1], &pdata[0], header.slot_count);
+			mtx.unlock();
 		}
 	}
 
@@ -47,29 +57,51 @@ class MyNotifyHandler : public sacn::Receiver::NotifyHandler
 	}
 };
 
-int main()
+DWORD WINAPI ThreadFun(LPVOID lpParam)
 {
-	cout << "Hello CMake." << endl;
+	PDATA data = (PDATA)lpParam;
 
-	etcpal::Logger logger;
-	sacn::Init(logger);
-	
-	etcpal::Uuid my_cid = etcpal::Uuid();
-	std::string my_name = "sACNtoOpenDmx";
-	
+	sacn::Init();
+
 	sacn::Receiver::Settings config(1);
 	sacn::Receiver receiver;
 
 	MyNotifyHandler my_notify_handler;
 	receiver.Startup(config, my_notify_handler);
 
-	bool keep_running = true;
-
-	while (keep_running) 
+	int devices = FTDI_ListDevices();
+	if (devices > 0)
 	{
-		int ch = getchar();
-		keep_running = false;
+		ftdi_connected = FTDI_OpenDevice(0);
+		unsigned char send_on_change_flag = 1;
+		BOOL res = FTDI_SendData(8, &send_on_change_flag, 0);
 	}
 
+	SendNotifyMessage(data->hwnd, WMAPP_READY, NULL, NULL);
+
+	while (keep_running && ftdi_connected) {
+		mtx.lock();
+		BOOL res = FTDI_SendData(6, myDmx, 75);
+		mtx.unlock();
+	}
+
+	FTDI_ClosePort();
+
 	receiver.Shutdown();
+	return 0;
+}
+
+void RunThread(HWND hwnd) 
+{
+	PDATA pData = (PDATA)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DATA));
+	pData->hwnd = hwnd;
+	DWORD dwThreadId;
+
+	hThread = CreateThread(NULL, 0, ThreadFun, pData, 0, &dwThreadId);
+}
+
+void FinishThread()
+{
+	keep_running = false;
+	WaitForSingleObject(hThread, INFINITE);
 }

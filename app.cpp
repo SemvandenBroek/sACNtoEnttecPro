@@ -1,10 +1,13 @@
 #include "app.h"
+#include "sACNtoOpenDmx.h"
 
 HINSTANCE g_hInst = NULL;
 UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
 
 // Use a guid to uniquely identify our icon
-class __declspec(uuid("9D0B8B92-4E1C-488e-A1E1-2331AFCE2CB5")) AppIcon;
+class __declspec(uuid("9D0B8B92-4E1C-488e-A1E1-2331AFCE2CB7")) AppIcon;
+
+CHAR appTitle[100];
 
 BOOL AddNotificationIcon(HWND hwnd)
 {
@@ -21,7 +24,19 @@ BOOL AddNotificationIcon(HWND hwnd)
 
 	// NOTIFYICON_VERSION_4 is prefered
 	nid.uVersion = NOTIFYICON_VERSION_4;
-	return Shell_NotifyIcon(NIM_SETVERSION, &nid);
+	BOOL bRet = Shell_NotifyIcon(NIM_SETVERSION, &nid);
+	
+	if (!bRet)
+	{
+		for (int i = 0; i < 4; i++)
+		{
+			if (bRet)
+				return bRet;
+			++nid.uID;
+			bRet = Shell_NotifyIcon(NIM_SETVERSION, &nid);
+		}
+	}
+	return -1;
 }
 
 void ShowContextMenu(HWND hwnd)
@@ -81,7 +96,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		switch (wmId)
 		{
 		case IDM_EXIT:
-			DestroyWindow(hwnd);
+			StopApplication(hwnd);
 			break;
 		}
 	}
@@ -97,6 +112,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 
+	case WMAPP_READY:
+		if (InSendMessage())
+			ReplyMessage(TRUE);
+		break;
 	default:
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
@@ -107,20 +126,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, PWSTR pCmdLine, in
 {
 	g_hInst = hInstance;
 
-	CHAR szTitle[100];
-	LoadString(hInstance, IDS_APP_TITLE, szTitle, ARRAYSIZE(szTitle));
+	LoadString(hInstance, IDS_APP_TITLE, appTitle, ARRAYSIZE(appTitle));
+	
 
 	WNDCLASS wc = { };
 
 	wc.lpfnWndProc = WindowProc;
 	wc.hInstance = hInstance;
-	wc.lpszClassName = szTitle;
+	wc.lpszClassName = appTitle;
 
 	RegisterClass(&wc);
 
 	HWND hwnd = CreateWindowEx(
 		0,                              // Optional window styles.
-		szTitle,                     // Window class
+		appTitle,                     // Window class
 		NULL,    // Window text
 		WS_OVERLAPPEDWINDOW,            // Window style
 
@@ -139,6 +158,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, PWSTR pCmdLine, in
 	}
 
 	ShowWindow(hwnd, SW_HIDE);
+	RunThread(hwnd);
 
 	MSG msg = { };
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -146,4 +166,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, PWSTR pCmdLine, in
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+}
+
+void StopApplication(HWND hwnd)
+{
+	FinishThread();
+	DestroyWindow(hwnd);
 }
