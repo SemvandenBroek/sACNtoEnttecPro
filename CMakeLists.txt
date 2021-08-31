@@ -6,7 +6,8 @@ cmake_minimum_required (VERSION 3.8)
 project ("sACNtoOpenDmx")
 
 # Add source to this project's executable.
-add_executable (sACNtoOpenDmx "sACNtoOpenDmx.cpp" "sACNtoOpenDmx.h")
+add_executable (sACNtoOpenDmx WIN32 "sACNtoOpenDmx.cpp" "sACNtoOpenDmx.h" "resource.h" "resource.rc" "app.cpp" "app.h")
+set_source_files_properties(resource.rc PROPERTIES LANGUAGE RC)
 
 # Add sACN library
 add_subdirectory("lib/sACN")
