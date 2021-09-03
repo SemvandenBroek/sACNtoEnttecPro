@@ -5,13 +5,14 @@ HINSTANCE g_hInst = NULL;
 UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
 
 // Use a guid to uniquely identify our icon
-class __declspec(uuid("9D0B8B92-4E1C-488e-A1E1-2331AFCE2CB7")) AppIcon;
+class __declspec(uuid("9bc5e0fe-9d08-4ae6-8474-05c91ce83d36")) AppIcon;
+NOTIFYICONDATA nid;
 
 CHAR appTitle[100];
 
 BOOL AddNotificationIcon(HWND hwnd)
 {
-	NOTIFYICONDATA nid = { sizeof(nid) };
+	nid = { sizeof(nid) };
 	nid.hWnd = hwnd;
 	nid.guidItem = __uuidof(AppIcon);
 	nid.uCallbackMessage = WMAPP_NOTIFYCALLBACK;
@@ -19,24 +20,27 @@ BOOL AddNotificationIcon(HWND hwnd)
 	// the icon will be identified with the GUID
 	nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE | NIF_SHOWTIP | NIF_GUID;
 	LoadIconMetric(g_hInst, (PCWSTR)MAKEINTRESOURCE(IDI_NOTIFICATIONICON), LIM_SMALL, &nid.hIcon);
-	LoadString(g_hInst, IDS_APP_TITLE, nid.szTip, ARRAYSIZE(nid.szTip));
+	LoadString(g_hInst, TOOLTIP_DISCONNECTED, nid.szTip, ARRAYSIZE(nid.szTip));
 	Shell_NotifyIcon(NIM_ADD, &nid);
 
 	// NOTIFYICON_VERSION_4 is prefered
 	nid.uVersion = NOTIFYICON_VERSION_4;
-	BOOL bRet = Shell_NotifyIcon(NIM_SETVERSION, &nid);
-	
-	if (!bRet)
+	return Shell_NotifyIcon(NIM_SETVERSION, &nid);
+}
+
+void SetNotificationConnected(BOOL connected)
+{
+	if (connected)
 	{
-		for (int i = 0; i < 4; i++)
-		{
-			if (bRet)
-				return bRet;
-			++nid.uID;
-			bRet = Shell_NotifyIcon(NIM_SETVERSION, &nid);
-		}
+		LoadString(g_hInst, TOOLTIP_CONNECTED, nid.szTip, ARRAYSIZE(nid.szTip));
+		LoadIconMetric(g_hInst, (PCWSTR)MAKEINTRESOURCE(IDI_NOTIFICATIONICON_CONNECTED), LIM_SMALL, &nid.hIcon);
 	}
-	return -1;
+	else
+	{
+		LoadString(g_hInst, TOOLTIP_DISCONNECTED, nid.szTip, ARRAYSIZE(nid.szTip));
+		LoadIconMetric(g_hInst, (PCWSTR)MAKEINTRESOURCE(IDI_NOTIFICATIONICON), LIM_SMALL, &nid.hIcon);
+	}
+	Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
 void ShowContextMenu(HWND hwnd)
@@ -75,6 +79,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	switch (uMsg)
 	{
 	case WM_DESTROY:
+		Shell_NotifyIcon(NIM_DELETE, &nid);
 		PostQuitMessage(0);
 		return 0;
 
@@ -87,6 +92,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				"Error adding icon", MB_OK);
 			return -1;
 		}
+		RunThread(hwnd);
 		break;
 
 	case WM_COMMAND:
@@ -115,6 +121,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WMAPP_READY:
 		if (InSendMessage())
 			ReplyMessage(TRUE);
+		break;
+
+	case WMAPP_STATUS:
+		switch (LOWORD(lParam))
+		{
+		case FTDI_CONNECTED:
+			SetNotificationConnected(true);
+			break;
+		case FTDI_DISCONNECTED:
+			SetNotificationConnected(false);
+			break;
+		}
 		break;
 	default:
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -158,7 +176,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, PWSTR pCmdLine, in
 	}
 
 	ShowWindow(hwnd, SW_HIDE);
-	RunThread(hwnd);
 
 	MSG msg = { };
 	while (GetMessage(&msg, NULL, 0, 0))

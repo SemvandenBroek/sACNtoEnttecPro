@@ -2,12 +2,14 @@
 #include "windows.h"
 
 IDI_NOTIFICATIONICON ICON "resources/app_icon.ico"
+IDI_NOTIFICATIONICON_CONNECTED ICON "resources/app_icon_connected.ico"
 IDC_NOTIFICATIONICON ICON "resources/app_icon.ico"
 
 STRINGTABLE
 	BEGIN
-		IDS_APP_TITLE       "sACNtoOpenDmx"
-		IDS_APP_RUNNING		"Applicatie draait"
+		IDS_APP_TITLE       "sACNtoEnttecPro"
+		TOOLTIP_CONNECTED	"sACNtoEnttecPro (connected)"
+		TOOLTIP_DISCONNECTED	"sACNtoEnttecPro (disconnected)"
 END
 
 IDC_CONTEXTMENU MENU
